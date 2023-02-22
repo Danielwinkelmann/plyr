@@ -4899,11 +4899,12 @@ const googlecast = {
     // Set the class hook
     toggleClass(this.elements.container, this.config.classNames.googlecast.enabled, true);
     if (!window.chrome.cast) {
-      window['__onGCastApiAvailable'] = function (isAvailable) {
+      window.__onGCastApiAvailable = function (isAvailable) {
         if (!isAvailable) return;
         googlecast.defaults = {
           options: {
-            receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+            receiverApplicationId: 'C597EF23',
+            // window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
             // receiverApplicationId: 'C248C800',
             autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
           }
@@ -5008,8 +5009,9 @@ const googlecast = {
     const defaults = {
       mediaInfo: {
         source: plyr.source,
-        contentType: 'video/mp4'
+        contentType: 'application/x-mpegURL' //  'video/mp4',
       },
+
       metadata: {
         metadataType: window.chrome.cast.media.MetadataType.GENERIC,
         title: plyr.config.title || plyr.source,
