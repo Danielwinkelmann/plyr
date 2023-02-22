@@ -666,6 +666,7 @@ typeof navigator === "object" && (function (global, factory) {
     // Airplay support
     // Safari only currently
     airplay: is.function(window.WebKitPlaybackTargetAvailabilityEvent),
+    googlecast: !is.nullOrUndefined(window.chrome),
     // Inline playback support
     // https://webkit.org/blog/6784/new-video-policies-for-ios/
     playsinline: 'playsInline' in document.createElement('video'),
@@ -1610,6 +1611,13 @@ typeof navigator === "object" && (function (global, factory) {
           type = 'play';
           props.label = 'play';
           props.icon = 'play';
+          break;
+        case 'googlecast':
+          props.toggle = true;
+          props.label = 'enableGoogleCast';
+          props.labelPressed = 'disableGoogleCast';
+          props.icon = 'googlecast-off';
+          props.iconPressed = 'googlecast-on';
           break;
         default:
           if (is.empty(props.label)) {
@@ -2741,6 +2749,10 @@ typeof navigator === "object" && (function (global, factory) {
           container.appendChild(createButton.call(this, 'airplay', defaultAttributes));
         }
 
+        // Google cast button
+        if (control === 'googlecast' && support.googlecast) {
+          container.appendChild(controls.createButton.call(this, 'googlecast'));
+        }
         // Download button
         if (control === 'download') {
           const attributes = extend({}, defaultAttributes, {
@@ -3488,7 +3500,7 @@ typeof navigator === "object" && (function (global, factory) {
     // 'duration',
     'mute', 'volume', 'captions', 'settings', 'pip', 'airplay',
     // 'download',
-    'fullscreen'],
+    'googlecast', 'fullscreen'],
     settings: ['captions', 'quality', 'speed'],
     // Localisation
     i18n: {
@@ -3511,6 +3523,8 @@ typeof navigator === "object" && (function (global, factory) {
       download: 'Download',
       enterFullscreen: 'Enter fullscreen',
       exitFullscreen: 'Exit fullscreen',
+      enableGoogleCast: 'Google Cast',
+      disableGoogleCast: 'Disable Cast',
       frameTitle: 'Player for {title}',
       captions: 'Captions',
       settings: 'Settings',
@@ -3550,6 +3564,9 @@ typeof navigator === "object" && (function (global, factory) {
       },
       googleIMA: {
         sdk: 'https://imasdk.googleapis.com/js/sdkloader/ima3.js'
+      },
+      googlecast: {
+        api: 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1'
       }
     },
     // Custom control listeners
@@ -3567,6 +3584,7 @@ typeof navigator === "object" && (function (global, factory) {
       fullscreen: null,
       pip: null,
       airplay: null,
+      googlecast: null,
       speed: null,
       quality: null,
       loop: null,
@@ -3607,6 +3625,7 @@ typeof navigator === "object" && (function (global, factory) {
         fullscreen: '[data-plyr="fullscreen"]',
         pip: '[data-plyr="pip"]',
         airplay: '[data-plyr="airplay"]',
+        googlecast: '[data-plyr="googlecast"]',
         settings: '[data-plyr="settings"]',
         loop: '[data-plyr="loop"]'
       },
@@ -3627,7 +3646,8 @@ typeof navigator === "object" && (function (global, factory) {
       },
       progress: '.plyr__progress',
       captions: '.plyr__captions',
-      caption: '.plyr__caption'
+      caption: '.plyr__caption',
+      googlecast: '.plyr__googlecast'
     },
     // Class hooks added to the player in different states
     classNames: {
@@ -3681,6 +3701,10 @@ typeof navigator === "object" && (function (global, factory) {
         active: 'plyr--airplay-active'
       },
       tabFocus: 'plyr__tab-focus',
+      googlecast: {
+        enabled: 'plyr--googlecast-enabled',
+        active: 'plyr--googlecast-active'
+      },
       previewThumbnails: {
         // Tooltip thumbs
         thumbContainer: 'plyr__preview-thumb',
@@ -4072,6 +4096,670 @@ typeof navigator === "object" && (function (global, factory) {
     }
   }
 
+  var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
+
+  function createCommonjsModule(fn, module) {
+  	return module = { exports: {} }, fn(module, module.exports), module.exports;
+  }
+
+  var loadjs_umd = createCommonjsModule(function (module, exports) {
+    (function (root, factory) {
+      {
+        module.exports = factory();
+      }
+    })(commonjsGlobal, function () {
+      /**
+       * Global dependencies.
+       * @global {Object} document - DOM
+       */
+
+      var devnull = function () {},
+        bundleIdCache = {},
+        bundleResultCache = {},
+        bundleCallbackQueue = {};
+
+      /**
+       * Subscribe to bundle load event.
+       * @param {string[]} bundleIds - Bundle ids
+       * @param {Function} callbackFn - The callback function
+       */
+      function subscribe(bundleIds, callbackFn) {
+        // listify
+        bundleIds = bundleIds.push ? bundleIds : [bundleIds];
+        var depsNotFound = [],
+          i = bundleIds.length,
+          numWaiting = i,
+          fn,
+          bundleId,
+          r,
+          q;
+
+        // define callback function
+        fn = function (bundleId, pathsNotFound) {
+          if (pathsNotFound.length) depsNotFound.push(bundleId);
+          numWaiting--;
+          if (!numWaiting) callbackFn(depsNotFound);
+        };
+
+        // register callback
+        while (i--) {
+          bundleId = bundleIds[i];
+
+          // execute callback if in result cache
+          r = bundleResultCache[bundleId];
+          if (r) {
+            fn(bundleId, r);
+            continue;
+          }
+
+          // add to callback queue
+          q = bundleCallbackQueue[bundleId] = bundleCallbackQueue[bundleId] || [];
+          q.push(fn);
+        }
+      }
+
+      /**
+       * Publish bundle load event.
+       * @param {string} bundleId - Bundle id
+       * @param {string[]} pathsNotFound - List of files not found
+       */
+      function publish(bundleId, pathsNotFound) {
+        // exit if id isn't defined
+        if (!bundleId) return;
+        var q = bundleCallbackQueue[bundleId];
+
+        // cache result
+        bundleResultCache[bundleId] = pathsNotFound;
+
+        // exit if queue is empty
+        if (!q) return;
+
+        // empty callback queue
+        while (q.length) {
+          q[0](bundleId, pathsNotFound);
+          q.splice(0, 1);
+        }
+      }
+
+      /**
+       * Execute callbacks.
+       * @param {Object or Function} args - The callback args
+       * @param {string[]} depsNotFound - List of dependencies not found
+       */
+      function executeCallbacks(args, depsNotFound) {
+        // accept function as argument
+        if (args.call) args = {
+          success: args
+        };
+
+        // success and error callbacks
+        if (depsNotFound.length) (args.error || devnull)(depsNotFound);else (args.success || devnull)(args);
+      }
+
+      /**
+       * Load individual file.
+       * @param {string} path - The file path
+       * @param {Function} callbackFn - The callback function
+       */
+      function loadFile(path, callbackFn, args, numTries) {
+        var doc = document,
+          async = args.async,
+          maxTries = (args.numRetries || 0) + 1,
+          beforeCallbackFn = args.before || devnull,
+          pathname = path.replace(/[\?|#].*$/, ''),
+          pathStripped = path.replace(/^(css|img)!/, ''),
+          isLegacyIECss,
+          e;
+        numTries = numTries || 0;
+        if (/(^css!|\.css$)/.test(pathname)) {
+          // css
+          e = doc.createElement('link');
+          e.rel = 'stylesheet';
+          e.href = pathStripped;
+
+          // tag IE9+
+          isLegacyIECss = 'hideFocus' in e;
+
+          // use preload in IE Edge (to detect load errors)
+          if (isLegacyIECss && e.relList) {
+            isLegacyIECss = 0;
+            e.rel = 'preload';
+            e.as = 'style';
+          }
+        } else if (/(^img!|\.(png|gif|jpg|svg|webp)$)/.test(pathname)) {
+          // image
+          e = doc.createElement('img');
+          e.src = pathStripped;
+        } else {
+          // javascript
+          e = doc.createElement('script');
+          e.src = path;
+          e.async = async === undefined ? true : async;
+        }
+        e.onload = e.onerror = e.onbeforeload = function (ev) {
+          var result = ev.type[0];
+
+          // treat empty stylesheets as failures to get around lack of onerror
+          // support in IE9-11
+          if (isLegacyIECss) {
+            try {
+              if (!e.sheet.cssText.length) result = 'e';
+            } catch (x) {
+              // sheets objects created from load errors don't allow access to
+              // `cssText` (unless error is Code:18 SecurityError)
+              if (x.code != 18) result = 'e';
+            }
+          }
+
+          // handle retries in case of load failure
+          if (result == 'e') {
+            // increment counter
+            numTries += 1;
+
+            // exit function and try again
+            if (numTries < maxTries) {
+              return loadFile(path, callbackFn, args, numTries);
+            }
+          } else if (e.rel == 'preload' && e.as == 'style') {
+            // activate preloaded stylesheets
+            return e.rel = 'stylesheet'; // jshint ignore:line
+          }
+
+          // execute callback
+          callbackFn(path, result, ev.defaultPrevented);
+        };
+
+        // add to document (unless callback returns `false`)
+        if (beforeCallbackFn(path, e) !== false) doc.head.appendChild(e);
+      }
+
+      /**
+       * Load multiple files.
+       * @param {string[]} paths - The file paths
+       * @param {Function} callbackFn - The callback function
+       */
+      function loadFiles(paths, callbackFn, args) {
+        // listify paths
+        paths = paths.push ? paths : [paths];
+        var numWaiting = paths.length,
+          x = numWaiting,
+          pathsNotFound = [],
+          fn,
+          i;
+
+        // define callback function
+        fn = function (path, result, defaultPrevented) {
+          // handle error
+          if (result == 'e') pathsNotFound.push(path);
+
+          // handle beforeload event. If defaultPrevented then that means the load
+          // will be blocked (ex. Ghostery/ABP on Safari)
+          if (result == 'b') {
+            if (defaultPrevented) pathsNotFound.push(path);else return;
+          }
+          numWaiting--;
+          if (!numWaiting) callbackFn(pathsNotFound);
+        };
+
+        // load scripts
+        for (i = 0; i < x; i++) loadFile(paths[i], fn, args);
+      }
+
+      /**
+       * Initiate script load and register bundle.
+       * @param {(string|string[])} paths - The file paths
+       * @param {(string|Function|Object)} [arg1] - The (1) bundleId or (2) success
+       *   callback or (3) object literal with success/error arguments, numRetries,
+       *   etc.
+       * @param {(Function|Object)} [arg2] - The (1) success callback or (2) object
+       *   literal with success/error arguments, numRetries, etc.
+       */
+      function loadjs(paths, arg1, arg2) {
+        var bundleId, args;
+
+        // bundleId (if string)
+        if (arg1 && arg1.trim) bundleId = arg1;
+
+        // args (default is {})
+        args = (bundleId ? arg2 : arg1) || {};
+
+        // throw error if bundle is already defined
+        if (bundleId) {
+          if (bundleId in bundleIdCache) {
+            throw "LoadJS";
+          } else {
+            bundleIdCache[bundleId] = true;
+          }
+        }
+        function loadFn(resolve, reject) {
+          loadFiles(paths, function (pathsNotFound) {
+            // execute callbacks
+            executeCallbacks(args, pathsNotFound);
+
+            // resolve Promise
+            if (resolve) {
+              executeCallbacks({
+                success: resolve,
+                error: reject
+              }, pathsNotFound);
+            }
+
+            // publish bundle load event
+            publish(bundleId, pathsNotFound);
+          }, args);
+        }
+        if (args.returnPromise) return new Promise(loadFn);else loadFn();
+      }
+
+      /**
+       * Execute callbacks when dependencies have been satisfied.
+       * @param {(string|string[])} deps - List of bundle ids
+       * @param {Object} args - success/error arguments
+       */
+      loadjs.ready = function ready(deps, args) {
+        // subscribe to bundle load event
+        subscribe(deps, function (depsNotFound) {
+          // execute callbacks
+          executeCallbacks(args, depsNotFound);
+        });
+        return loadjs;
+      };
+
+      /**
+       * Manually satisfy bundle dependencies.
+       * @param {string} bundleId - The bundle id
+       */
+      loadjs.done = function done(bundleId) {
+        publish(bundleId, []);
+      };
+
+      /**
+       * Reset loadjs dependencies statuses
+       */
+      loadjs.reset = function reset() {
+        bundleIdCache = {};
+        bundleResultCache = {};
+        bundleCallbackQueue = {};
+      };
+
+      /**
+       * Determine if bundle has already been defined
+       * @param String} bundleId - The bundle id
+       */
+      loadjs.isDefined = function isDefined(bundleId) {
+        return bundleId in bundleIdCache;
+      };
+
+      // export
+      return loadjs;
+    });
+  });
+
+  // ==========================================================================
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      loadjs_umd(url, {
+        success: resolve,
+        error: reject
+      });
+    });
+  }
+
+  const googlecast = {
+    setup(config) {
+      if (!window.chrome) {
+        // TODO: Figure out if this is the right check
+        // We're not on Chrome. Bail since google-cast does not work
+        // on other browsers
+        return;
+      }
+      googlecast.defaults = {};
+      googlecast.config = {};
+      googlecast.events = {
+        ready: googlecast.onReady,
+        play: googlecast.onPlay,
+        pause: googlecast.onPause,
+        seeked: googlecast.onSeek,
+        volumechange: googlecast.onVolumeChange,
+        qualityrequested: googlecast.onQualityChange,
+        loadedmetadata: googlecast.onLoadedMetadata
+      };
+      googlecast.debug = new Console(true);
+      // TODO: Get cast logs under a separate namespace?
+
+      // Inject the container
+      if (!is.element(this.elements.googlecast)) {
+        this.elements.googlecast = createElement('div', getAttributesFromSelector(this.config.selectors.googlecast));
+        insertAfter(this.elements.googlecast, this.elements.wrapper);
+      }
+      // Set the class hook
+      toggleClass(this.elements.container, this.config.classNames.googlecast.enabled, true);
+      if (!window.chrome.cast) {
+        window['__onGCastApiAvailable'] = function (isAvailable) {
+          if (!isAvailable) return;
+          googlecast.defaults = {
+            options: {
+              receiverApplicationId: window.chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+              // receiverApplicationId: 'C248C800',
+              autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+            }
+          };
+          const opts = extend({}, googlecast.defaults, config);
+          googlecast.initializeCastApi(opts);
+        };
+        loadScript(this.config.urls.googlecast.api);
+      }
+    },
+    initializeCastApi(config) {
+      const {
+        framework
+      } = window.cast;
+      const {
+        CastContext
+      } = framework;
+      CastContext.getInstance().setOptions(config.options);
+
+      // Set up event handlers
+      CastContext.getInstance().addEventListener(framework.CastContextEventType.CAST_STATE_CHANGED, googlecast.castStateListener);
+      CastContext.getInstance().addEventListener(framework.CastContextEventType.SESSION_STATE_CHANGED, googlecast.sessionStateListener);
+      googlecast.debug.log('Initialized google cast');
+    },
+    getCurrentSession() {
+      return window.cast.framework.CastContext.getInstance().getCurrentSession();
+    },
+    getCurrentPlyr() {
+      return googlecast.currentPlyr;
+    },
+    onPlay() {
+      const plyr = googlecast.getCurrentPlyr();
+      googlecast.debug.log('Asking remote player to play');
+      // Seek before playing?
+      // googlecast.onSeek();
+      plyr.remotePlayerController.playOrPause();
+    },
+    onPause() {
+      const plyr = googlecast.getCurrentPlyr();
+      googlecast.debug.log('Asking remote player to pause');
+      plyr.remotePlayerController.playOrPause();
+      // Seek after pause
+      googlecast.onSeek();
+    },
+    onSeek() {
+      const plyr = googlecast.getCurrentPlyr();
+      const timestamp = plyr.currentTime;
+      plyr.remotePlayer.currentTime = timestamp;
+      plyr.remotePlayerController.seek();
+      googlecast.debug.log(`Asking remote player to seek to ${timestamp}`);
+    },
+    onLoadedMetadata() {
+      googlecast.debug.log('Running googlecast.onReady()');
+      const plyr = googlecast.getCurrentPlyr();
+      const oldLoadRequest = plyr.googlecastLoadRequest;
+      const newLoadRequest = googlecast.buildLoadRequest(plyr);
+      if (oldLoadRequest.media.contentId === newLoadRequest.media.contentId) {
+        return;
+      }
+      googlecast.loadMedia(plyr, newLoadRequest);
+    },
+    onReady() {
+      googlecast.debug.log('Running googlecast.onReady()');
+      const plyr = googlecast.getCurrentPlyr();
+      googlecast.loadMedia(plyr);
+    },
+    onVolumeChange() {
+      const plyr = googlecast.getCurrentPlyr();
+      // We need to specially handle the case where plyr is muted
+      let {
+        volume
+      } = plyr;
+      if (plyr.muted) {
+        volume = 0;
+      }
+      plyr.remotePlayer.volumeLevel = volume;
+      plyr.remotePlayerController.setVolumeLevel();
+    },
+    onQualityChange() {
+      const plyr = googlecast.getCurrentPlyr();
+      googlecast.loadMedia(plyr);
+    },
+    loadMedia(plyr, loadRequest) {
+      googlecast.debug.log('load media called');
+      const session = googlecast.getCurrentSession();
+      if (!session) {
+        return;
+      }
+      if (!loadRequest) {
+        loadRequest = googlecast.buildLoadRequest(plyr);
+      }
+      session.loadMedia(loadRequest).then(() => {
+        googlecast.debug.log('Successfully handled loadMedia');
+        googlecast.getCurrentPlyr().googlecastLoadRequest = loadRequest;
+        googlecast.bindPlyr(plyr);
+      }).catch(err => {
+        googlecast.debug.log(`Error during loadMedia: ${err}`);
+      });
+    },
+    buildLoadRequest(plyr) {
+      // TODO: We need to be able to override the defaults
+      const defaults = {
+        mediaInfo: {
+          source: plyr.source,
+          contentType: 'video/mp4'
+        },
+        metadata: {
+          metadataType: window.chrome.cast.media.MetadataType.GENERIC,
+          title: plyr.config.title || plyr.source,
+          images: [{
+            url: plyr.poster
+          }]
+        },
+        loadRequest: {
+          autoplay: plyr.playing,
+          currentTime: plyr.currentTime,
+          customData: {
+            type: plyr.type,
+            provider: plyr.provider
+          }
+        }
+      };
+      if (plyr.hls) {
+        // Plyr has been hijacked by HLS
+        const {
+          customData
+        } = defaults.loadRequest;
+        customData.subType = 'hls';
+        customData.source = plyr.hls.manifestURL;
+      }
+      const options = extend({}, defaults);
+      const mediaInfo = new window.chrome.cast.media.MediaInfo(options.mediaInfo.source, options.mediaInfo.contentType);
+      mediaInfo.streamType = defaults.mediaInfo.streamType;
+      mediaInfo.metadata = new window.chrome.cast.media.GenericMediaMetadata();
+      Object.assign(mediaInfo.metadata, options.metadata);
+      const loadRequest = new window.chrome.cast.media.LoadRequest(mediaInfo);
+      loadRequest.customData = options.loadRequest.customData;
+      loadRequest.autoplay = options.loadRequest.autoplay;
+      loadRequest.currentTime = options.loadRequest.currentTime;
+      return loadRequest;
+    },
+    setCurrentPlyr(plyr) {
+      googlecast.currentPlyr = plyr;
+    },
+    bindEvents(plyr) {
+      // Iterate over events and add all listeners
+      Object.keys(googlecast.events).forEach(evt => {
+        const fn = googlecast.events[evt];
+        plyr.on(evt, fn);
+      });
+    },
+    bindPlyr(plyr, options) {
+      if (googlecast.currentPlyr !== plyr) {
+        googlecast.debug.warn('Warning! Current plyr !==  plyr in bindPlyr()');
+        googlecast.currentPlyr = plyr;
+      }
+      googlecast.currentPlyrOptions = options;
+
+      // TODO: Figure out if we should do plyr.remotePlayer = plyr.remotePlayer || new window.cast.framework.RemotePlayer()
+      plyr.remotePlayer = new window.cast.framework.RemotePlayer();
+      // TODO: Figure out if we should do plyr.remotePlayerController = plyr.remotePlayerController || new window.cast.framework.RemotePlayerController(plyr.remotePlayer);
+      plyr.remotePlayerController = new window.cast.framework.RemotePlayerController(plyr.remotePlayer);
+      googlecast.bindEvents(plyr);
+      plyr.googlecastEnabled = true; // FIXME: This should probably use state from controls
+      googlecast.debug.log('Plyr bound');
+    },
+    unbindPlyr(plyr) {
+      const {
+        currentPlyr
+      } = googlecast;
+      if (currentPlyr === plyr) {
+        Object.keys(googlecast.events).forEach(evt => {
+          const fn = googlecast.events[evt];
+          plyr.off(evt, fn);
+        });
+      }
+      delete currentPlyr.googlecastEnabled; // FIXME: This should probably use state from controls
+      googlecast.currentPlyr = undefined;
+      googlecast.currentPlyrOptions = undefined;
+    },
+    getErrorMessage(error) {
+      const {
+        chrome
+      } = window;
+      switch (error.code) {
+        case chrome.cast.ErrorCode.API_NOT_INITIALIZED:
+          return `The API is not initialized.${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.CANCEL:
+          return `The operation was canceled by the user${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.CHANNEL_ERROR:
+          return `A channel to the receiver is not available.${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.EXTENSION_MISSING:
+          return `The Cast extension is not available.${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.INVALID_PARAMETER:
+          return `The parameters to the operation were not valid.${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.RECEIVER_UNAVAILABLE:
+          return `No receiver was compatible with the session request.${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.SESSION_ERROR:
+          return `A session could not be created, or a session was invalid.${error.description ? ` :${error.description}` : ''}`;
+        case chrome.cast.ErrorCode.TIMEOUT:
+          return `The operation timed out.${error.description ? ` :${error.description}` : ''}`;
+        default:
+          return `Unknown error: ${JSON.stringify(error)}`;
+      }
+    },
+    castStateListener(data) {
+      googlecast.debug.log(`Cast State Changed: ${JSON.stringify(data)}`);
+      const plyr = googlecast.getCurrentPlyr();
+      const cs = window.cast.framework.CastState;
+      let castEvent;
+      switch (data.castState) {
+        case cs.NO_DEVICES_AVAILABLE:
+        case cs.NOT_CONNECTED:
+          googlecast.debug.log('NOT CONNECTED');
+          castEvent = 'castdisabled';
+          break;
+        case cs.CONNECTING:
+          break;
+        case cs.CONNECTED:
+          castEvent = 'castenabled';
+          break;
+      }
+      if (plyr && castEvent) {
+        const castActive = castEvent === 'castenabled';
+        // Add class hook
+        toggleClass(plyr.elements.container, plyr.config.classNames.googlecast.active, castActive);
+        triggerEvent.call(plyr, plyr.elements.container, castEvent, true);
+      }
+    },
+    sessionStateListener(data) {
+      const plyr = googlecast.getCurrentPlyr();
+      if (!plyr) {
+        return;
+      }
+      // console.log("Session State Changed: " + JSON.stringify(data));
+      const ss = window.cast.framework.SessionState;
+      switch (data.sessionState) {
+        case ss.NO_SESSION:
+          break;
+        case ss.SESSION_STARTING:
+          break;
+        case ss.SESSION_STARTED:
+        case ss.SESSION_RESUMED:
+          // run on ready
+          googlecast.onReady();
+          break;
+        case ss.SESSION_START_FAILED:
+        case ss.SESSION_ENDED:
+          break;
+        case ss.SESSION_ENDING:
+          break;
+      }
+      googlecast.debug.log(`sessionStateListener: state=${data.sessionState}`);
+    },
+    requestSession(plyr) {
+      // Check if a session already exists, if it does, just use it
+      const session = googlecast.getCurrentSession();
+      let wasPlyrAlreadyBound = true;
+      const existingPlyr = googlecast.getCurrentPlyr();
+      if (existingPlyr !== undefined && existingPlyr !== plyr) {
+        googlecast.unbindPlyr(existingPlyr);
+      }
+      if (existingPlyr !== plyr) {
+        googlecast.setCurrentPlyr(plyr);
+        wasPlyrAlreadyBound = false;
+      }
+      function onRequestSuccess(e) {
+        // This only triggers when a new session is created.
+        // It does not trigger on successfully showing the drop down and
+        // requesting stop session.
+      }
+      function onError(e) {
+        googlecast.unbindPlyr(googlecast.getCurrentPlyr());
+      }
+
+      // We need to show the cast drop down if:
+      // 1) There was no session
+      // 2) There was a session and the current plyr was already bound
+      //
+      // (2) is needed since we need a way to disable cast via the current
+      // plyr instance
+      if (session === null || wasPlyrAlreadyBound) {
+        const promise = window.cast.framework.CastContext.getInstance().requestSession();
+        promise.then(onRequestSuccess, onError);
+      } else {
+        // We have a session and we're just looking to bind plyr which we've
+        // done already. Just load media and change icon based on session state.
+        const cs = window.cast.framework.CastContext.getInstance().getCastState();
+        const castStateEventData = new window.cast.framework.CastStateEventData(cs);
+        googlecast.castStateListener(castStateEventData);
+        const ss = window.cast.framework.CastContext.getInstance().getSessionState();
+        const sessionStateEventData = new window.cast.framework.SessionStateEventData(session, ss, 0);
+        googlecast.sessionStateListener(sessionStateEventData);
+      }
+    },
+    // Display cast container and button (for initialization)
+    show() {
+      // If there's no cast toggle, bail
+      if (!this.elements.buttons.googlecast) {
+        return;
+      }
+
+      // Try to load the value from storage
+      let active = this.storage.googlecast;
+
+      // Otherwise fall back to the default config
+      if (!is.boolean(active)) {
+        ({
+          active
+        } = this.googlecast);
+      } else {
+        this.googlecast.active = active;
+      }
+      if (active) {
+        toggleClass(this.elements.container, this.config.classNames.googlecast.active, true);
+        toggleState(this.elements.buttons.googlecast, true);
+      }
+    }
+  };
+
   // ==========================================================================
   // Load image avoiding xhr/fetch CORS issues
   // Server status can't be obtained this way unfortunately, so this uses "naturalWidth" to determine if the image has loaded
@@ -4141,6 +4829,9 @@ typeof navigator === "object" && (function (global, factory) {
       if (this.isHTML5) {
         captions.setup.call(this);
       }
+
+      // Google cast
+      googlecast.setup.call(this);
 
       // Reset volume
       this.volume = null;
@@ -4752,6 +5443,9 @@ typeof navigator === "object" && (function (global, factory) {
           triggerEvent.call(player, player.media, 'download');
         }, 'download');
 
+        // Google cast
+        this.bind(elements.buttons.googlecast, 'click', player.googlecast, 'googlecast');
+
         // Fullscreen toggle
         this.bind(elements.buttons.fullscreen, 'click', () => {
           player.fullscreen.toggle();
@@ -5142,315 +5836,6 @@ typeof navigator === "object" && (function (global, factory) {
     }
 
     // Device is touch enabled
-  }
-
-  var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
-
-  function createCommonjsModule(fn, module) {
-  	return module = { exports: {} }, fn(module, module.exports), module.exports;
-  }
-
-  var loadjs_umd = createCommonjsModule(function (module, exports) {
-    (function (root, factory) {
-      {
-        module.exports = factory();
-      }
-    })(commonjsGlobal, function () {
-      /**
-       * Global dependencies.
-       * @global {Object} document - DOM
-       */
-
-      var devnull = function () {},
-        bundleIdCache = {},
-        bundleResultCache = {},
-        bundleCallbackQueue = {};
-
-      /**
-       * Subscribe to bundle load event.
-       * @param {string[]} bundleIds - Bundle ids
-       * @param {Function} callbackFn - The callback function
-       */
-      function subscribe(bundleIds, callbackFn) {
-        // listify
-        bundleIds = bundleIds.push ? bundleIds : [bundleIds];
-        var depsNotFound = [],
-          i = bundleIds.length,
-          numWaiting = i,
-          fn,
-          bundleId,
-          r,
-          q;
-
-        // define callback function
-        fn = function (bundleId, pathsNotFound) {
-          if (pathsNotFound.length) depsNotFound.push(bundleId);
-          numWaiting--;
-          if (!numWaiting) callbackFn(depsNotFound);
-        };
-
-        // register callback
-        while (i--) {
-          bundleId = bundleIds[i];
-
-          // execute callback if in result cache
-          r = bundleResultCache[bundleId];
-          if (r) {
-            fn(bundleId, r);
-            continue;
-          }
-
-          // add to callback queue
-          q = bundleCallbackQueue[bundleId] = bundleCallbackQueue[bundleId] || [];
-          q.push(fn);
-        }
-      }
-
-      /**
-       * Publish bundle load event.
-       * @param {string} bundleId - Bundle id
-       * @param {string[]} pathsNotFound - List of files not found
-       */
-      function publish(bundleId, pathsNotFound) {
-        // exit if id isn't defined
-        if (!bundleId) return;
-        var q = bundleCallbackQueue[bundleId];
-
-        // cache result
-        bundleResultCache[bundleId] = pathsNotFound;
-
-        // exit if queue is empty
-        if (!q) return;
-
-        // empty callback queue
-        while (q.length) {
-          q[0](bundleId, pathsNotFound);
-          q.splice(0, 1);
-        }
-      }
-
-      /**
-       * Execute callbacks.
-       * @param {Object or Function} args - The callback args
-       * @param {string[]} depsNotFound - List of dependencies not found
-       */
-      function executeCallbacks(args, depsNotFound) {
-        // accept function as argument
-        if (args.call) args = {
-          success: args
-        };
-
-        // success and error callbacks
-        if (depsNotFound.length) (args.error || devnull)(depsNotFound);else (args.success || devnull)(args);
-      }
-
-      /**
-       * Load individual file.
-       * @param {string} path - The file path
-       * @param {Function} callbackFn - The callback function
-       */
-      function loadFile(path, callbackFn, args, numTries) {
-        var doc = document,
-          async = args.async,
-          maxTries = (args.numRetries || 0) + 1,
-          beforeCallbackFn = args.before || devnull,
-          pathname = path.replace(/[\?|#].*$/, ''),
-          pathStripped = path.replace(/^(css|img)!/, ''),
-          isLegacyIECss,
-          e;
-        numTries = numTries || 0;
-        if (/(^css!|\.css$)/.test(pathname)) {
-          // css
-          e = doc.createElement('link');
-          e.rel = 'stylesheet';
-          e.href = pathStripped;
-
-          // tag IE9+
-          isLegacyIECss = 'hideFocus' in e;
-
-          // use preload in IE Edge (to detect load errors)
-          if (isLegacyIECss && e.relList) {
-            isLegacyIECss = 0;
-            e.rel = 'preload';
-            e.as = 'style';
-          }
-        } else if (/(^img!|\.(png|gif|jpg|svg|webp)$)/.test(pathname)) {
-          // image
-          e = doc.createElement('img');
-          e.src = pathStripped;
-        } else {
-          // javascript
-          e = doc.createElement('script');
-          e.src = path;
-          e.async = async === undefined ? true : async;
-        }
-        e.onload = e.onerror = e.onbeforeload = function (ev) {
-          var result = ev.type[0];
-
-          // treat empty stylesheets as failures to get around lack of onerror
-          // support in IE9-11
-          if (isLegacyIECss) {
-            try {
-              if (!e.sheet.cssText.length) result = 'e';
-            } catch (x) {
-              // sheets objects created from load errors don't allow access to
-              // `cssText` (unless error is Code:18 SecurityError)
-              if (x.code != 18) result = 'e';
-            }
-          }
-
-          // handle retries in case of load failure
-          if (result == 'e') {
-            // increment counter
-            numTries += 1;
-
-            // exit function and try again
-            if (numTries < maxTries) {
-              return loadFile(path, callbackFn, args, numTries);
-            }
-          } else if (e.rel == 'preload' && e.as == 'style') {
-            // activate preloaded stylesheets
-            return e.rel = 'stylesheet'; // jshint ignore:line
-          }
-
-          // execute callback
-          callbackFn(path, result, ev.defaultPrevented);
-        };
-
-        // add to document (unless callback returns `false`)
-        if (beforeCallbackFn(path, e) !== false) doc.head.appendChild(e);
-      }
-
-      /**
-       * Load multiple files.
-       * @param {string[]} paths - The file paths
-       * @param {Function} callbackFn - The callback function
-       */
-      function loadFiles(paths, callbackFn, args) {
-        // listify paths
-        paths = paths.push ? paths : [paths];
-        var numWaiting = paths.length,
-          x = numWaiting,
-          pathsNotFound = [],
-          fn,
-          i;
-
-        // define callback function
-        fn = function (path, result, defaultPrevented) {
-          // handle error
-          if (result == 'e') pathsNotFound.push(path);
-
-          // handle beforeload event. If defaultPrevented then that means the load
-          // will be blocked (ex. Ghostery/ABP on Safari)
-          if (result == 'b') {
-            if (defaultPrevented) pathsNotFound.push(path);else return;
-          }
-          numWaiting--;
-          if (!numWaiting) callbackFn(pathsNotFound);
-        };
-
-        // load scripts
-        for (i = 0; i < x; i++) loadFile(paths[i], fn, args);
-      }
-
-      /**
-       * Initiate script load and register bundle.
-       * @param {(string|string[])} paths - The file paths
-       * @param {(string|Function|Object)} [arg1] - The (1) bundleId or (2) success
-       *   callback or (3) object literal with success/error arguments, numRetries,
-       *   etc.
-       * @param {(Function|Object)} [arg2] - The (1) success callback or (2) object
-       *   literal with success/error arguments, numRetries, etc.
-       */
-      function loadjs(paths, arg1, arg2) {
-        var bundleId, args;
-
-        // bundleId (if string)
-        if (arg1 && arg1.trim) bundleId = arg1;
-
-        // args (default is {})
-        args = (bundleId ? arg2 : arg1) || {};
-
-        // throw error if bundle is already defined
-        if (bundleId) {
-          if (bundleId in bundleIdCache) {
-            throw "LoadJS";
-          } else {
-            bundleIdCache[bundleId] = true;
-          }
-        }
-        function loadFn(resolve, reject) {
-          loadFiles(paths, function (pathsNotFound) {
-            // execute callbacks
-            executeCallbacks(args, pathsNotFound);
-
-            // resolve Promise
-            if (resolve) {
-              executeCallbacks({
-                success: resolve,
-                error: reject
-              }, pathsNotFound);
-            }
-
-            // publish bundle load event
-            publish(bundleId, pathsNotFound);
-          }, args);
-        }
-        if (args.returnPromise) return new Promise(loadFn);else loadFn();
-      }
-
-      /**
-       * Execute callbacks when dependencies have been satisfied.
-       * @param {(string|string[])} deps - List of bundle ids
-       * @param {Object} args - success/error arguments
-       */
-      loadjs.ready = function ready(deps, args) {
-        // subscribe to bundle load event
-        subscribe(deps, function (depsNotFound) {
-          // execute callbacks
-          executeCallbacks(args, depsNotFound);
-        });
-        return loadjs;
-      };
-
-      /**
-       * Manually satisfy bundle dependencies.
-       * @param {string} bundleId - The bundle id
-       */
-      loadjs.done = function done(bundleId) {
-        publish(bundleId, []);
-      };
-
-      /**
-       * Reset loadjs dependencies statuses
-       */
-      loadjs.reset = function reset() {
-        bundleIdCache = {};
-        bundleResultCache = {};
-        bundleCallbackQueue = {};
-      };
-
-      /**
-       * Determine if bundle has already been defined
-       * @param String} bundleId - The bundle id
-       */
-      loadjs.isDefined = function isDefined(bundleId) {
-        return bundleId in bundleIdCache;
-      };
-
-      // export
-      return loadjs;
-    });
-  });
-
-  // ==========================================================================
-  function loadScript(url) {
-    return new Promise((resolve, reject) => {
-      loadjs_umd(url, {
-        success: resolve,
-        error: reject
-      });
-    });
   }
 
   // ==========================================================================
@@ -7438,6 +7823,9 @@ typeof navigator === "object" && (function (global, factory) {
 
       // Cancel current network requests
       html5.cancelRequests.call(this);
+      if (this.hls) {
+        this.hls.destroy();
+      }
 
       // Destroy instance and re-setup
       this.destroy.call(this, () => {
@@ -7447,6 +7835,9 @@ typeof navigator === "object" && (function (global, factory) {
         // Remove elements
         removeElement(this.media);
         this.media = null;
+
+        // Remove hls property if set
+        delete plyr.hls;
 
         // Reset class name
         if (is.element(this.elements.container)) {
@@ -8649,6 +9040,21 @@ typeof navigator === "object" && (function (global, factory) {
     /**
      * Trigger the airplay dialog
      * TODO: update player with state, support, enabled
+     */
+
+    /**
+     * Trigger google cast dialog
+     */
+    googlecast() {
+      if (!support.googlecast) {
+        return;
+      }
+      googlecast.requestSession(this);
+    }
+
+    /**
+     * Toggle the player controls
+     * @param {Boolean} [toggle] - Whether to show the controls
      */
 
     /**
